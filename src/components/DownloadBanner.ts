@@ -27,8 +27,23 @@ export function detectPlatform(): Platform {
 
 export interface DlButton { cls: string; href: string; label: string }
 
+function normalizeOrigin(value: string): string {
+  return value.replace(/\/+$/, '');
+}
+
+function getDownloadApiOrigin(): string {
+  const envOrigin = (import.meta.env.VITE_DOWNLOAD_API_ORIGIN as string | undefined)?.trim();
+  if (envOrigin) return normalizeOrigin(envOrigin);
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return normalizeOrigin(window.location.origin);
+  }
+
+  return getCanonicalApiOrigin();
+}
+
 export function allButtons(): DlButton[] {
-  const apiOrigin = getCanonicalApiOrigin();
+  const apiOrigin = getDownloadApiOrigin();
   return [
     { cls: 'mac', href: `${apiOrigin}/api/download?platform=macos-arm64`, label: `\uF8FF ${t('modals.downloadBanner.macSilicon')}` },
     { cls: 'mac', href: `${apiOrigin}/api/download?platform=macos-x64`, label: `\uF8FF ${t('modals.downloadBanner.macIntel')}` },
