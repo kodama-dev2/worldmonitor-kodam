@@ -21,6 +21,39 @@ const VARIANT_IDENTIFIERS = {
   finance: ['financemonitor'],
 };
 
+const PLATFORM_ENV_KEYS = {
+  'windows-exe': ['DOWNLOAD_URL_WINDOWS_EXE', 'DOWNLOAD_URL_WINDOWS'],
+  'windows-msi': ['DOWNLOAD_URL_WINDOWS_MSI', 'DOWNLOAD_URL_WINDOWS'],
+  'macos-arm64': ['DOWNLOAD_URL_MACOS_ARM64', 'DOWNLOAD_URL_MAC_SILICON'],
+  'macos-x64': ['DOWNLOAD_URL_MACOS_X64', 'DOWNLOAD_URL_MAC_INTEL'],
+  'linux-appimage': ['DOWNLOAD_URL_LINUX_APPIMAGE', 'DOWNLOAD_URL_LINUX_X64', 'DOWNLOAD_URL_LINUX'],
+  'linux-appimage-arm64': ['DOWNLOAD_URL_LINUX_APPIMAGE_ARM64', 'DOWNLOAD_URL_LINUX_ARM64'],
+};
+
+function getEnv(name) {
+  const value = process?.env?.[name];
+  return typeof value === 'string' && value.trim() !== '' ? value.trim() : '';
+}
+
+function buildVariantEnvKey(baseKey, variant) {
+  if (!variant) return '';
+  return `${baseKey}_${variant.toUpperCase()}`;
+}
+
+function resolveCustomDownloadUrl(platform, variant) {
+  const keys = PLATFORM_ENV_KEYS[platform] ?? [];
+  for (const key of keys) {
+    const variantKey = buildVariantEnvKey(key, variant);
+    if (variantKey) {
+      const variantValue = getEnv(variantKey);
+      if (variantValue) return variantValue;
+    }
+    const value = getEnv(key);
+    if (value) return value;
+  }
+  return '';
+}
+
 function canonicalAssetName(name) {
   return String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
@@ -49,6 +82,17 @@ export default async function handler(req) {
   }
 
   try {
+    const customUrl = resolveCustomDownloadUrl(platform, variant);
+    if (customUrl) {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          'Location': customUrl,
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=60, stale-if-error=600',
+        },
+      });
+    }
+
     const release = await fetchLatestRelease('WorldMonitor-Download-Redirect');
     if (!release) {
       return Response.redirect(RELEASES_PAGE, 302);
